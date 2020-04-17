@@ -1,0 +1,21 @@
+# useful commands
+# systemctl daemon-reload
+# systemctl enable doorbell@doorbell.service
+# systemctl restart doorbell@doorbell.service
+# systemctl status doorbell@doorbell.service
+[Unit]
+After=multi-user.target
+Description=doorbell
+StartLimitIntervalSec=600
+StartLimitBurst=10
+[Service]
+ExecStartPre=/usr/bin/cp /var/log/doorbell.log /var/log/doorbell.log.0
+ExecStart=/usr/bin/python3 /opt/face_recognition/files/main.py
+Group=root
+Restart=always
+RestartSec=30
+Type=forking
+User=root
+WorkingDirectory=/opt/face_recognition/files
+[Install]
+WantedBy=multi-user.target
