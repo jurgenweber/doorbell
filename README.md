@@ -1,7 +1,7 @@
-#
-# script to stream video camera and see if faces turn up in front of it
-# then notify moquitto mqtt to do 'stuff' as a doorbell
-#
+# My DoorBell
+
+script to stream my video camera and see if faces turn up in front of it
+it will then send a payload to moquitto mqtt.
 
 Links:
 https://www.hackster.io/robin-cole/pi-camera-doorbell-with-notifications-408d3d
