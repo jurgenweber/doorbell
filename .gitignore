@@ -1,0 +1,9 @@
+pictures
+.vagrant
+*.log
+*.core
+uid.txt
+aptdebs
+root
+log
+config.yaml
