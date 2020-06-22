@@ -216,8 +216,13 @@ class DoorBell():
             the_time = str(time.strftime("%Y%m%d%H%M%S"))
 
             try:
-                frame = queue.get()
+                # https://docs.python.org/3/library/multiprocessing.html#multiprocessing.Queue.get
+                frame = queue.get(True,60)
                 logger.debug("I have a frame from the queue")
+
+            except queue.empty:
+                logger.error("my queue is empty, continue")
+                continue
 
             except:
                 logger.error("failed to get frame from the queue, continue")
