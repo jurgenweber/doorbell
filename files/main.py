@@ -145,7 +145,7 @@ class DoorBell():
         # https://stackoverflow.com/questions/11312525/catch-ctrlc-sigint-and-exit-multiprocesses-gracefully-in-python
         original_sigint_handler = signal.signal(signal.SIGINT, signal.SIG_IGN)
 
-        pool = mp.Pool(4, db.worker, (porch_camera_image,post,queue,mqtt_name,last_face_detection))
+        pool = mp.Pool(4, db.worker, (porch_camera_image,post,queue,mqtt_name,last_face_detection), 1000)
 
         signal.signal(signal.SIGTERM, original_sigint_handler)
 
