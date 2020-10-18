@@ -12,7 +12,7 @@ import numpy
 # cv2 vs opencv? opencv handles the import cv2
 import cv2
 import cvlib as cv
-# import face_recognition
+import face_recognition
 
 import logging
 
@@ -234,15 +234,21 @@ class DoorBell():
             small_frame = frame
 
             logger.debug("Find all the faces and face encodings in the current frame of video")
+
+            # cv lib
             faces, confidences = cv.detect_face(small_frame)
+
+            # face_recognition, https://face-recognition.readthedocs.io/en/latest/face_recognition.html#face_recognition.api.face_locations
+            # faces      = face_recognition.face_locations(small_frame, number_of_times_to_upsample=1, model='hog')
             face_count = len(faces)
+
+            logger.info(faces)
+            logger.info(confidences)
 
             # are there any faces in the array?
             if face_count > 0:
                 logger.info("I found {} face(s) in this photograph.".format(face_count))
 
-                logger.info(faces)
-                logger.info(confidences)
 
                 # using a global variable to avoid every thread in the pool posting at the same time
                 most_recent_face_detection = int(time.time())
@@ -258,6 +264,7 @@ class DoorBell():
                     post = True
 
                     # https://github.com/arunponnusamy/cvlib/blob/master/examples/face_detection.py
+                    # this is cvlib
                     for face,conf in zip(faces,confidences):
 
                         confpercentage = (conf * 100)
@@ -281,6 +288,29 @@ class DoorBell():
                             cv2.putText(small_frame, text, (startX,Y), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,255,0), 2)
 
                     post_frame = small_frame
+
+                    # face_recognition, https://github.com/ageitgey/face_recognition/blob/master/examples/identify_and_draw_boxes_on_faces.py#L29-L63
+                    # this library does not have confidence, so just get ready to publish if it finds something
+                    # client.publish('doorbell/porch', 'ding,dong')
+                    # filename = '/opt/face_recognition/pictures/face/' + the_time + '.png'
+                    # mqtt_name = 'camera/porch_face'
+                    # 
+                    # # Convert the image to a PIL-format image so that we can draw on top of it with the Pillow library
+                    # # See http://pillow.readthedocs.io/ for more about PIL/Pillow
+                    # face_encodings = face_recognition.face_encodings(small_frame, faces)
+                    # pil_image = Image.fromarray(small_frame)
+                    # # Create a Pillow ImageDraw Draw instance to draw with
+                    # draw = ImageDraw.Draw(pil_image)
+                    # 
+                    # # Loop through each face found in the unknown image
+                    # for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
+                    # 
+                    #     # Draw a box around the face using the Pillow module
+                    #     draw.rectangle(((left, top), (right, bottom)), outline=(0, 0, 255))
+
+                    # del draw
+
+                    # post_frame = numpy.array(pil_image)
 
             else:
                 # using a global variable to avoid every thread in the pool posting at the same time
