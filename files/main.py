@@ -395,7 +395,12 @@ class DoorBell():
                 client.publish('doorbell/state', payload, db.mqttQos, db.mqttRetained)
 
                 if face_count > 0:
-                    confidences_average = sum(confidences) * 100 / len(confidences)
+                    confidences_average = sum(face_confidences) * 100 / len(face_confidences)
+                else:
+                    confidences_average = 0
+
+                if object_count > 0:
+                    confidences_average = sum(object_confidences) * 100 / len(object_confidences)
                 else:
                     confidences_average = 0
 
