@@ -12,7 +12,7 @@ import numpy
 # cv2 vs opencv? opencv handles the import cv2
 import cv2
 import cvlib as cv
-import face_recognition
+# import face_recognition
 
 import logging
 
@@ -153,9 +153,9 @@ class DoorBell():
 
             while True:
                 # seems to drop CPU by 15% (0.1 second sleep)
-                # time.sleep(0.5) # seemed to run at .2 load
+                # time.sleep(0.5) # seemed to run at .2 load, even with object detection on... any lower numbers with object create lots of load.
                 # time.sleep(0.25)
-                time.sleep(0.05)
+                time.sleep(0.5)
                 # new setup seems to take 0 CPU, removing, #.9 to 1.0 load
 
                 # Grab a single frame of video
@@ -233,22 +233,31 @@ class DoorBell():
             # small_frame = frame[80:360,0:640], 
             small_frame = frame
 
-            logger.debug("Find all the faces and face encodings in the current frame of video")
+            logger.debug("Find all the faces, objects, etc in the current frame of video")
 
             # cv lib
-            faces, confidences = cv.detect_face(small_frame)
+            # https://docs.cvlib.net/face_detection/
+            faces, face_confidences          = cv.detect_face(small_frame, enable_gpu=False)
+            # https://docs.cvlib.net/object_detection/
+            objects, label, object_confidences = cv.detect_common_objects(small_frame, confidence=0.25, model='yolov3', enable_gpu=False)
 
             # face_recognition, https://face-recognition.readthedocs.io/en/latest/face_recognition.html#face_recognition.api.face_locations
             # faces      = face_recognition.face_locations(small_frame, number_of_times_to_upsample=1, model='hog')
-            face_count = len(faces)
+            face_count   = len(faces)
+            object_count = len(objects)
 
-            logger.info(faces)
-            logger.info(confidences)
+            if face_count > 0:
+              logger.info("I found {} face(s) in this photograph.".format(face_count))
+              logger.info(faces)
+              logger.info(face_confidences)
+
+            if object_count > 0:
+              logger.info("I found {} objects(s) in this photograph.".format(object_count))
+              logger.info(objects)
+              logger.info(object_confidences)
 
             # are there any faces in the array?
-            if face_count > 0:
-                logger.info("I found {} face(s) in this photograph.".format(face_count))
-
+            if face_count > 0 or object_count > 0:
 
                 # using a global variable to avoid every thread in the pool posting at the same time
                 most_recent_face_detection = int(time.time())
@@ -260,16 +269,18 @@ class DoorBell():
 
                 # this used to be once every 15 seconds, massively reducing to get more numbers
                 # and see what confidences looks like, this variable is a different in seconds since the last post
-                if diff_face_detection > 1:
+                if diff_face_detection > 1 and face_count > 0:
                     post = True
 
                     # https://github.com/arunponnusamy/cvlib/blob/master/examples/face_detection.py
                     # this is cvlib
-                    for face,conf in zip(faces,confidences):
+                    for face,conf in zip(faces,face_confidences):
 
                         confpercentage = (conf * 100)
 
-                        if confpercentage > 60:
+                        if confpercentage > 40:
+
+                            logger.info("drawing boxes and setting up mqtt for a found face")
 
                             client.publish('doorbell/porch', 'ding,dong')
                             filename = '/opt/face_recognition/pictures/face/' + the_time + '.png'
@@ -279,6 +290,35 @@ class DoorBell():
                             (endX,endY) = face[2],face[3]
 
                             # draw rectangle over face
+                            cv2.rectangle(small_frame, (startX,startY), (endX,endY), (0,255,0), 2)
+
+                            # https://github.com/arunponnusamy/cvlib/blob/master/examples/face_detection_webcam.py#L44
+                            # write confidence percentage on top of face rectangle
+                            text = "{:.2f}%".format(confpercentage)
+                            Y = startY - 10 if startY - 10 > 10 else startY + 10
+                            cv2.putText(small_frame, text, (startX,Y), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,255,0), 2)
+
+                    post_frame = small_frame
+
+                if diff_face_detection > 1 and object_count > 0:
+                    post = True
+
+                    for object,conf in zip(objects,object_confidences):
+
+                        confpercentage = (conf * 100)
+
+                        if confpercentage > 40:
+
+                            logger.info("drawing boxes and setting up mqtt for a found object")
+
+                            client.publish('doorbell/porch', 'ding,dong')
+                            filename = '/opt/face_recognition/pictures/face/' + the_time + '.png'
+                            mqtt_name = 'camera/porch_face'
+
+                            (startX,startY) = object[0],object[1]
+                            (endX,endY) = object[2],object[3]
+
+                            # draw rectangle over object
                             cv2.rectangle(small_frame, (startX,startY), (endX,endY), (0,255,0), 2)
 
                             # https://github.com/arunponnusamy/cvlib/blob/master/examples/face_detection_webcam.py#L44
@@ -317,10 +357,14 @@ class DoorBell():
                 later = int(time.time())
                 diff = later - porch_camera_image.value
                 filename = '/opt/face_recognition/pictures/image/' + the_time + '.png'
-                if diff > 10:
-                    logger.debug("it has been longer than 10 seconds since the last post to HASS")
+
+                # I don't use this camera in hass anymore, could potentially disable
+                if diff > 60:
+                    logger.debug("it has been longer than 60 seconds since the last post to HASS")
                     mqtt_name = 'camera/porch'
-                    post = True
+
+                    # disabling here, was True
+                    post = False
                     post_frame = frame
 
                     # this is some funky stuff for the shared variable
@@ -328,6 +372,9 @@ class DoorBell():
                         porch_camera_image.value = int(time.time())
 
             if post == True:
+
+                logger.info("setting up to post")
+
                 # this writes to file and works
                 cv2.imwrite(filename,post_frame)
 
@@ -339,7 +386,7 @@ class DoorBell():
                 try:
                     # post to mosquitto
                     client.publish(mqtt_name, data, db.mqttQos, db.mqttRetained)
-                    logger.debug("pushed to mqtt")
+                    logger.debug("pushed image to mqtt")
                 except:
                     logger.error("push failed")
 
@@ -352,6 +399,7 @@ class DoorBell():
                 else:
                     confidences_average = 0
 
+                logger.info("push attributes to mqtt")
                 payload = '{ "date": ' + the_time + ', "face": ' + str(face_count) + ', "confidences": ' + str(confidences_average) + '  }'
                 client.publish('doorbell/attributes', payload, db.mqttQos, db.mqttRetained)
 
