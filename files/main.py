@@ -363,8 +363,8 @@ class DoorBell():
                     logger.debug("it has been longer than 60 seconds since the last post to HASS")
                     mqtt_name = 'camera/porch'
 
-                    # disabling here, was True
-                    post = False
+                    # Needs to be true to update the status
+                    post = True
                     post_frame = frame
 
                     # this is some funky stuff for the shared variable
